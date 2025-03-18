@@ -40,9 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
         scoreDisplay.textContent = score;
     }
 
-    // Сжатие массива (для одной строки или столбца)
+    // Сжатие массива
     function compress(arr) {
-        let newArr = arr.filter(val => val); // Убираем нули
+        let newArr = arr.filter(val => val);
         for (let i = 0; i < newArr.length - 1; i++) {
             if (newArr[i] === newArr[i + 1]) {
                 newArr[i] *= 2;
@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 newArr.splice(i + 1, 1);
             }
         }
-        while (newArr.length < 4) newArr.push(0); // Дополняем нули
+        while (newArr.length < 4) newArr.push(0);
         return newArr;
     }
 
@@ -105,16 +105,55 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Обработка нажатий клавиш
+    // Управление с клавиатуры
     document.addEventListener('keydown', (e) => {
-        e.preventDefault(); // Предотвращаем скроллинг страницы
-        switch(e.key) {
+        e.preventDefault();
+        switch (e.key) {
             case 'ArrowLeft': move('left'); break;
             case 'ArrowRight': move('right'); break;
             case 'ArrowUp': move('up'); break;
             case 'ArrowDown': move('down'); break;
         }
     });
+
+    // Управление с помощью сенсорных жестов (для iPhone и других устройств)
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, false);
+
+    document.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+        handleSwipe();
+    }, false);
+
+    function handleSwipe() {
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+        const minSwipeDistance = 30; // Минимальная дистанция для распознавания свайпа
+
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+            // Горизонтальный свайп
+            if (deltaX > minSwipeDistance) {
+                move('right');
+            } else if (deltaX < -minSwipeDistance) {
+                move('left');
+            }
+        } else {
+            // Вертикальный свайп
+            if (deltaY > minSwipeDistance) {
+                move('down');
+            } else if (deltaY < -minSwipeDistance) {
+                move('up');
+            }
+        }
+    }
 
     init();
 });
