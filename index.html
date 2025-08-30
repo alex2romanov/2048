@@ -1,16 +1,97 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="ru">
 <head>
-    <title>2048</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MVP Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff; --text: #111111; --card: #f2f3f5; --accent: #0a84ff; --muted: #6b7280;
+      --radius: 14px;
+    }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+           background: var(--bg); color: var(--text); }
+    .wrap { padding: 16px; max-width: 640px; margin: 0 auto; }
+    .card { background: var(--card); border-radius: var(--radius); padding: 16px; margin-top: 12px; }
+    h1 { font-size: 20px; margin: 0 0 6px; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
+    button { appearance:none; border:none; border-radius:12px; padding:12px 16px; font-size:16px; cursor:pointer; }
+    .btn { background: var(--accent); color:#fff; }
+    .btn-outline { background: transparent; outline: 2px solid var(--accent); color: var(--accent); }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>2048</h1>
-        <div class="score">Score: <span id="score">0</span></div>
-        <div class="grid" id="grid"></div>
+  <div class="wrap">
+    <div class="card">
+      <h1>Mini App — MVP</h1>
+      <div class="muted" id="who"></div>
     </div>
-    <script src="script.js"></script>
+
+    <div class="card">
+      <b>Кредиты</b>
+      <div class="muted" style="margin-top:6px">
+        Покупка тестовая — без списания Stars (бот должен поддерживать STARS_TEST).
+      </div>
+      <div class="row">
+        <button class="btn" id="buyTest">Пополнить 500 (тест)</button>
+        <button class="btn-outline" id="buyReal">Купить 500 ⭐</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <b>Действия</b>
+      <div class="row">
+        <button class="btn-outline" id="ping">Пинг</button>
+        <button class="btn-outline" id="close">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const tg = window.Telegram.WebApp;
+
+  // Тема Telegram
+  function applyTheme(){
+    const s = tg.colorScheme === 'dark' ? tg.themeParams : tg.themeParams;
+    document.documentElement.style.setProperty('--bg',    s.bg_color            || '#ffffff');
+    document.documentElement.style.setProperty('--text',  s.text_color          || '#111111');
+    document.documentElement.style.setProperty('--card',  s.secondary_bg_color  || '#f2f3f5');
+    document.documentElement.style.setProperty('--accent',s.button_color        || '#0a84ff');
+    document.documentElement.style.setProperty('--muted', s.hint_color          || '#6b7280');
+  }
+
+  tg.ready();
+  applyTheme();
+  tg.onEvent('themeChanged', applyTheme);
+
+  // Кто зашёл
+  const u = (tg.initDataUnsafe && tg.initDataUnsafe.user) || {};
+  document.getElementById('who').innerText =
+    `Пользователь: ${u.first_name || ''} ${u.last_name || ''} (@${u.username || '—'}) • id=${u.id || '—'}`;
+
+  // Кнопки
+  document.getElementById('buyTest').onclick = () => {
+    tg.HapticFeedback.impactOccurred('light');
+    tg.sendData(JSON.stringify({action:'buy_test', pack:'starter', amount:500}));
+    tg.close(); // минимально: отправили команду боту и закрыли мини-апп
+  };
+
+  document.getElementById('buyReal').onclick = () => {
+    tg.HapticFeedback.impactOccurred('medium');
+    tg.sendData(JSON.stringify({action:'buy_real', pack:'starter', amount:500}));
+    tg.close();
+  };
+
+  document.getElementById('ping').onclick = () => {
+    tg.showAlert('pong ✨');
+  };
+
+  document.getElementById('close').onclick = () => tg.close();
+})();
+</script>
 </body>
 </html>
+
