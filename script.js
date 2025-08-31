@@ -1,10 +1,6 @@
-<script>
-(function(){
+(function () {
   const tg = window.Telegram.WebApp;
 
-  // ... ваш код ...
-
-  // ===== МОДЕЛИ =====
   const MODELS = [
     { id: "openai/gpt-4o-mini",          label: "GPT-4o Mini" },
     { id: "openai/gpt-4o",               label: "GPT-4o" },
@@ -20,22 +16,20 @@
     { id: "qwen/qwen-2.5-72b-instruct",  label: "Qwen 2.5 72B" },
   ];
 
-  const modelSelect = document.getElementById('modelSelect');
+  const modelSelect = document.getElementById("modelSelect");
   MODELS.forEach(m => {
-    const opt = document.createElement('option');
+    const opt = document.createElement("option");
     opt.value = m.id;
     opt.textContent = m.label;
     modelSelect.appendChild(opt);
   });
 
-  document.getElementById('applyModel').onclick = () => {
+  document.getElementById("applyModel").onclick = () => {
     const id = modelSelect.value;
     const label = (MODELS.find(m => m.id === id) || {}).label || id;
-    tg.HapticFeedback.impactOccurred('rigid');
-    tg.sendData(JSON.stringify({ action: 'set_model', model_id: id, label }));
+    tg.HapticFeedback.impactOccurred("rigid");
+    tg.sendData(JSON.stringify({ action: "set_model", model_id: id, label }));
     tg.close();
   };
-
-  // ... ваш код ...
 })();
-</script>
+
