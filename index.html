@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MVP Mini App</title>
+  <style>
+    :root { --bg:#fff; --text:#111; --card:#f2f3f5; --accent:#0a84ff; --muted:#6b7280; --radius:14px; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { padding:16px; max-width:640px; margin:0 auto; }
+    .card { background:var(--card); border-radius:var(--radius); padding:16px; margin-top:12px; }
+    h1 { font-size:20px; margin:0 0 6px; }
+    .muted { color:var(--muted); font-size:14px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
+    button { appearance:none; border:none; border-radius:12px; padding:12px 16px; font-size:16px; cursor:pointer; }
+    .btn { background:var(--accent); color:#fff; }
+    .btn-outline { background:transparent; outline:2px solid var(--accent); color:var(--accent); }
+    .card a { word-break: break-all; }
+  </style>
+  <!-- ВАЖНО: библиотека Telegram должна грузиться до вашего кода -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Mini App — MVP</h1>
+      <div class="muted" id="who"></div>
+    </div>
+
+    <div class="card">
+      <b>Кредиты</b>
+      <div class="muted" style="margin-top:6px">Покупка тестовая — без списания Stars (бот должен поддерживать STARS_TEST).</div>
+      <div class="row">
+        <button class="btn" id="buyTest">Пополнить 500 (тест)</button>
+        <button class="btn-outline" id="buyReal">Купить 500 ⭐</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <b>Модель</b>
+      <div class="muted" style="margin-top:6px">Выберите модель, которой будет отвечать бот.</div>
+      <div class="row">
+        <select id="modelSelect" style="flex:1; padding:10px; border-radius:10px; border:1px solid #ddd"></select>
+        <button class="btn" id="applyModel">Выбрать</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <b>Действия</b>
+      <div class="row">
+        <button class="btn-outline" id="ping">Пинг</button>
+        <button class="btn-outline" id="close">Закрыть</button>
+      </div>
+    </div>
+
+    <!-- История: ОБЯЗАТЕЛЬНО вне <script> -->
+    <div class="card">
+      <b>История</b>
+      <div class="row" style="margin-top:6px">
+        <button class="btn-outline" id="btnLoad">Обновить</button>
+      </div>
+      <div id="hist" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // Один раз объявляем объект приложения
+  const tgApp = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+
+  // Автоматически разворачиваем WebApp и применяем тему, если внутри Telegram
+  function applyTheme(){
+    if (!tgApp) return;
+    const s = tgApp.themeParams || {};
+    document.documentElement.style.setProperty('--bg',    s.bg_color            || '#ffffff');
+    document.documentElement.style.setProperty('--text',  s.text_color          || '#111111');
+    document.documentElement.style.setProperty('--card',  s.secondary_bg_color  || '#f2f3f5');
+    document.documentElement.style.setProperty('--accent',s.button_color        || '#0a84ff');
+    document.documentElement.style.setProperty('--muted', s.hint_color          || '#6b7280');
+  }
+
+  if (tgApp) {
+    tgApp.ready();
+    tgApp.expand();
+    tgApp.onEvent('themeChanged', applyTheme);
+  }
+  applyTheme();
+
+  // Кто зашёл (если внутри Telegram)
+  const u = tgApp?.initDataUnsafe?.user || {};
+  document.getElementById('who').innerText =
+    `Пользователь: ${u.first_name || ''} ${u.last_name || ''} (@${u.username || '—'}) • id=${u.id || '—'}`;
+
+  // Кнопки кредитов
+  document.getElementById('buyTest').onclick = () => {
+    if (!tgApp) return alert('Откройте в Telegram');
+    tgApp.HapticFeedback?.impactOccurred?.('light');
+    tgApp.sendData(JSON.stringify({action:'buy_test', pack:'starter', amount:500}));
+    tgApp.close();
+  };
+  document.getElementById('buyReal').onclick = () => {
+    if (!tgApp) return alert('Откройте в Telegram');
+    tgApp.HapticFeedback?.impactOccurred?.('medium');
+    tgApp.sendData(JSON.stringify({action:'buy_real', pack:'starter', amount:500}));
+    tgApp.close();
+  };
+  document.getElementById('ping').onclick = () => tgApp ? tgApp.showAlert('pong ✨') : alert('pong ✨');
+  document.getElementById('close').onclick = () => tgApp ? tgApp.close() : window.close();
+
+  // ===== История =====
+  const API_BASE = "https://overall-adipex-roommate-civic.trycloudflare.com"; // <-- ваш Cloudflare URL
+
+  async function loadHistory(offset=0, limit=20) {
+    const initData = tgApp?.initData || ""; // внутри Telegram придёт подпись
+    // Если открыли СНЕ Telegram (например, напрямую на GitHub Pages), сервер вернёт 401.
+    // Для локальных проверок можно включить DEV_ALLOW_NO_AUTH=1 и добавить ?dev_user_id=... на бекенде.
+    const url = `${API_BASE}/api/history?limit=${limit}&offset=${offset}`;
+    const res = await fetch(url, { headers: { "X-Telegram-Init-Data": initData } });
+
+    const el = document.getElementById('hist');
+    if (!res.ok) {
+      const txt = await res.text();
+      el.innerHTML = `<div class="muted">Ошибка: ${res.status} ${txt}<br/>Откройте Mini App внутри Telegram.</div>`;
+      return;
+    }
+
+    const data = await res.json();
+    el.innerHTML = "";
+    for (const t of data.items) {
+      const card = document.createElement('div');
+      card.style.border = "1px solid #ccc";
+      card.style.padding = "8px";
+      card.style.borderRadius = "10px";
+      card.style.margin = "8px 0";
+      const dt = t.finished_at || t.created_at || "";
+      card.innerHTML = `
+        <div><b>#${t.id}</b> — ${t.type} [${t.status}] ${t.progress ?? 0}%</div>
+        <div class="muted"><small>${dt}</small></div>
+        ${t.result_url ? `<div style="margin-top:6px;"><a href="${t.result_url}" target="_blank">Скачать результат</a></div>` : ""}
+        ${t.error_text ? `<div style="color:#b00; margin-top:6px;">Ошибка: ${t.error_text}</div>` : ""}
+      `;
+      el.appendChild(card);
+    }
+    if (data.items.length === 0) {
+      el.innerHTML = `<div class="muted">Пока пусто. Сгенерируйте картинку через /img в чате.</div>`;
+    }
+  }
+
+  document.getElementById('btnLoad').addEventListener('click', () => loadHistory());
+  // автозагрузка при открытии
+  loadHistory();
+})();
+</script>
+
+<!-- Если у вас есть отдельный script.js, можно оставить, но следите, чтобы там не было второго "const tg = ..." -->
+<!-- <script src="./script.js?v=2" defer></script> -->
+</body>
+</html>
