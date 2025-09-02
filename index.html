@@ -108,46 +108,58 @@
   document.getElementById('close').onclick = () => tgApp ? tgApp.close() : window.close();
 
   // ===== История =====
-  const API_BASE = "https://emerald-intense-desktops-tear.trycloudflare.com"; // <-- ваш Cloudflare URL
+  const qs = new URLSearchParams(location.search);
+  const API_BASE = qs.get("api") || "https://emerald-intense-desktops-tear.trycloudflare.com";
+  const DEV_MODE = qs.get("dev") === "1";
+  const UID = qs.get("uid"); // dev_user_id для тестов в браузере
 
   async function loadHistory(offset=0, limit=20) {
-    const initData = tgApp?.initData || ""; // внутри Telegram придёт подпись
-    // Если открыли СНЕ Telegram (например, напрямую на GitHub Pages), сервер вернёт 401.
-    // Для локальных проверок можно включить DEV_ALLOW_NO_AUTH=1 и добавить ?dev_user_id=... на бекенде.
-    const url = `${API_BASE}/api/history?limit=${limit}&offset=${offset}`;
-    const res = await fetch(url, { headers: { "X-Telegram-Init-Data": initData } });
-
     const el = document.getElementById('hist');
-    if (!res.ok) {
-      const txt = await res.text();
-      el.innerHTML = `<div class="muted">Ошибка: ${res.status} ${txt}<br/>Откройте Mini App внутри Telegram.</div>`;
-      return;
+    el.innerHTML = '<div class="muted">Загружаю…</div>';
+
+    const initData = tgApp?.initData || "";
+    let url = `${API_BASE}/api/history?limit=${limit}&offset=${offset}`;
+    const headers = {};
+
+    if (initData) {
+      headers["X-Telegram-Init-Data"] = initData; // путь для Telegram
+    } else if (DEV_MODE && UID) {
+      url += `&dev_user_id=${encodeURIComponent(UID)}`; // путь для браузера
     }
 
-    const data = await res.json();
-    el.innerHTML = "";
-    for (const t of data.items) {
-      const card = document.createElement('div');
-      card.style.border = "1px solid #ccc";
-      card.style.padding = "8px";
-      card.style.borderRadius = "10px";
-      card.style.margin = "8px 0";
-      const dt = t.finished_at || t.created_at || "";
-      card.innerHTML = `
-        <div><b>#${t.id}</b> — ${t.type} [${t.status}] ${t.progress ?? 0}%</div>
-        <div class="muted"><small>${dt}</small></div>
-        ${t.result_url ? `<div style="margin-top:6px;"><a href="${t.result_url}" target="_blank">Скачать результат</a></div>` : ""}
-        ${t.error_text ? `<div style="color:#b00; margin-top:6px;">Ошибка: ${t.error_text}</div>` : ""}
-      `;
-      el.appendChild(card);
-    }
-    if (data.items.length === 0) {
-      el.innerHTML = `<div class="muted">Пока пусто. Сгенерируйте картинку через /img в чате.</div>`;
+    try {
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        const txt = await res.text();
+        el.innerHTML = `<div class="muted">Ошибка: ${res.status} ${txt}<br>Откройте Mini App внутри Telegram или добавьте ?dev=1&uid=<ваш_id> в адресной строке для теста.</div>`;
+        return;
+      }
+      const data = await res.json();
+      el.innerHTML = "";
+      for (const t of data.items) {
+        const card = document.createElement('div');
+        card.style.border = "1px solid #ccc";
+        card.style.padding = "8px";
+        card.style.borderRadius = "10px";
+        card.style.margin = "8px 0";
+        const dt = t.finished_at || t.created_at || "";
+        card.innerHTML = `
+          <div><b>#${t.id}</b> — ${t.type} [${t.status}] ${t.progress ?? 0}%</div>
+          <div class="muted"><small>${dt}</small></div>
+          ${t.result_url ? `<div style="margin-top:6px;"><a href="${t.result_url}" target="_blank" rel="noopener">Скачать результат</a></div>` : ""}
+          ${t.error_text ? `<div style="color:#b00; margin-top:6px;">Ошибка: ${t.error_text}</div>` : ""}
+        `;
+        el.appendChild(card);
+      }
+      if (data.items.length === 0) {
+        el.innerHTML = `<div class="muted">Пока пусто. Сгенерируйте картинку через /img в чате.</div>`;
+      }
+    } catch (e) {
+      el.innerHTML = `<div class="muted">Сетевая ошибка: ${e}</div>`;
     }
   }
 
   document.getElementById('btnLoad').addEventListener('click', () => loadHistory());
-  // автозагрузка при открытии
   loadHistory();
 })();
 </script>
