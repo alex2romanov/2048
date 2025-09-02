@@ -1,6 +1,5 @@
 (function () {
   const boot = () => {
-    const tg = window.Telegram.WebApp;
 
     const MODELS = [
       {"id": "openai/gpt-4o-mini",         "label": "GPT-4o Mini"},
