@@ -108,48 +108,7 @@
   <button id="btnLoad">Обновить</button>
   <div id="hist"></div>
 </section>
-
-<script>
-  const tg = window.Telegram?.WebApp;
-  tg && tg.expand(); // на всякий
-  const API_BASE = "https://overall-adipex-roommate-civic.trycloudflare.com";
-
-
-  async function loadHistory(offset=0, limit=20) {
-    const initData = tg?.initData || ""; // Telegram сам подставит
-    const res = await fetch(`${API_BASE}/api/history?limit=${limit}&offset=${offset}`, {
-      headers: { "X-Telegram-Init-Data": initData }
-    });
-    if (!res.ok) {
-      const txt = await res.text();
-      document.getElementById('hist').innerText = `Ошибка: ${res.status} ${txt}`;
-      return;
-    }
-    const data = await res.json();
-    const el = document.getElementById('hist');
-    el.innerHTML = "";
-    for (const t of data.items) {
-      const card = document.createElement('div');
-      card.style.border = "1px solid #ccc";
-      card.style.padding = "8px";
-      card.style.margin = "8px 0";
-      const dt = t.finished_at || t.created_at;
-      card.innerHTML = `
-        <div><b>#${t.id}</b> — ${t.type} [${t.status}] ${t.progress ?? 0}%</div>
-        <div><small>${dt}</small></div>
-        ${t.result_url ? `<div><a href="${t.result_url}" target="_blank">Скачать результат</a></div>` : ""}
-        ${t.error_text ? `<div style="color:#b00;">Ошибка: ${t.error_text}</div>` : ""}
-      `;
-      el.appendChild(card);
-    }
-  }
-
-  document.getElementById('btnLoad').addEventListener('click', () => loadHistory());
-  // Авто-загрузка при открытии:
-  loadHistory();
-</script>
   
-</script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="./script.js?v=2" defer></script>
 </body>
