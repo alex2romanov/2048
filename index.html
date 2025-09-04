@@ -66,7 +66,7 @@
 (function(){
   const tgApp = window.Telegram?.WebApp || null;
 
-  // --- Диагностическая панель ---
+  // --- Диагностика в UI ---
   const histEl = document.getElementById('hist');
   const dbg = (label, value) => {
     console.log(label, value);
@@ -77,53 +77,45 @@
     histEl.appendChild(div);
   };
 
-  dbg("location.href", location.href);
-  dbg("document.referrer", document.referrer || "(empty)");
-
-  // --- Достаём api несколькими способами ---
-  const search = location.search.startsWith('?') ? location.search.slice(1) : location.search;
-  const qs = new URLSearchParams(search);
+  // --- Читаем api из query/hash ---
+  const qs = new URLSearchParams(location.search.startsWith('?') ? location.search.slice(1) : location.search);
   const apiRaw = (qs.get("api") || "").trim();
-  dbg("apiRaw (from search)", apiRaw);
-
-  // иногда люди передают api не в search, а в hash — на всякий случай попробуем и там
   let apiHashRaw = "";
   if (location.hash.includes("api=")) {
-    const h = location.hash.replace(/^#/, "");
-    const hqs = new URLSearchParams(h);
+    const hqs = new URLSearchParams(location.hash.replace(/^#/, ""));
     apiHashRaw = (hqs.get("api") || "").trim();
-    dbg("apiRaw (from hash)", apiHashRaw);
   }
 
-  // Выбираем то, что нашли первым
-  const apiCandidate = apiRaw || apiHashRaw;
-  dbg("apiCandidate before decode", apiCandidate);
+  dbg("apiRaw (search)", apiRaw || "(empty)");
+  dbg("apiRaw (hash)", apiHashRaw || "(empty)");
 
-  // Пробуем аккуратно декодировать (вдруг дважды кодировали)
+  // Аккуратно декодируем
   let decoded1 = "";
   let decoded2 = "";
-  try { decoded1 = decodeURIComponent(apiCandidate); } catch (e) { decoded1 = "(decode1 failed)"; }
-  try { decoded2 = decodeURIComponent(decoded1); } catch (e) { decoded2 = "(decode2 failed)"; }
-  dbg("decoded1", decoded1);
-  dbg("decoded2", decoded2);
+  try { decoded1 = decodeURIComponent(apiRaw || apiHashRaw); } catch(e) { decoded1 = "(decode1 failed)"; }
+  try { decoded2 = decodeURIComponent(decoded1); } catch(e) { decoded2 = "(decode2 failed)"; }
 
-  // Выбираем адекватный вариант
-  const API_BASE = /^https:\/\//.test(decoded2) ? decoded2
-                   : /^https:\/\//.test(decoded1) ? decoded1
-                   : apiCandidate;
+  // Выбор API_BASE
+  let API_BASE = /^https:\/\//.test(decoded2) ? decoded2
+               : /^https:\/\//.test(decoded1) ? decoded1
+               : "";
 
-  dbg("API_BASE chosen", API_BASE);
+  // Идентификация платформы
+  const platform = (tgApp && tgApp.platform) ? tgApp.platform : "browser";
+  dbg("platform", platform);
 
-  // Валидация (разрешаем trailing слэш, но без пути)
-  function isGoodBase(u) {
-    return /^https:\/\/[A-Za-z0-9.-]+(?::\d+)?\/?$/.test(u);
+  // Если мы точно в Telegram (есть initData), а API пустой/битый — fallback:
+  const DEFAULT_API_BASE = "https://566b0ceecefa.ngrok-free.app"; // <-- ПОДСТАВЬ текущий ngrok
+  const initData = tgApp?.initData || "";
+  if ((!API_BASE || !/^https:\/\/[A-Za-z0-9.-]+(?::\d+)?\/?$/.test(API_BASE)) && initData) {
+    API_BASE = DEFAULT_API_BASE;
+    dbg("API_BASE fallback used", API_BASE);
   }
 
-  if (!API_BASE || !isGoodBase(API_BASE)) {
+  if (!API_BASE || !/^https:\/\/[A-Za-z0-9.-]+(?::\d+)?\/?$/.test(API_BASE)) {
     histEl.innerHTML = `
       <div class="muted">
         Не задан или неверен параметр <code>?api=...</code>.<br>
-        <b>Что пришло:</b><br>
         apiRaw=${apiRaw || "(empty)"}<br>
         decoded1=${decoded1}<br>
         decoded2=${decoded2}<br>
@@ -134,41 +126,56 @@
   // Склейка без new URL
   const join = (p) => API_BASE.replace(/\/+$/,'') + p;
 
-  // --- initData от Telegram ---
-  const initData = tgApp?.initData || "";
-  const u = tgApp?.initDataUnsafe?.user || {};
-  document.getElementById('who').innerText =
-    `Пользователь: ${u.first_name || ''} ${u.last_name || ''} (@${u.username || '—'}) • id=${u.id || '—'} • initData=${initData ? 'len='+initData.length : 'empty'}`;
+  // Возвращаем инфо о пользователе (имя/ник/id + длина initData)
+  const user = tgApp?.initDataUnsafe?.user || null;
+  const whoEl = document.getElementById('who');
+  if (whoEl) {
+    const uname = user ? `@${user.username || '—'}` : '—';
+    const fname = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : '—';
+    whoEl.innerText = `Пользователь: ${fname} (${uname}) • id=${user?.id ?? '—'} • initData=${initData ? 'len='+initData.length : 'empty'}`;
+  }
 
-  const DEV_MODE = (new URLSearchParams(location.search)).get("dev") === "1";
-  const UID = (new URLSearchParams(location.search)).get("uid");
+  // Обход предупреждения ngrok:
+  // - на iOS НЕ ставим кастомный заголовок (избегаем preflight), только query-параметр
+  // - на остальных добавляем и параметр, и заголовок
+  const isNgrok = /ngrok-free\.app$/i.test(API_BASE) || /ngrok\.io$/i.test(API_BASE);
+  const useHeader = isNgrok && platform !== "ios";  // iOS: header выключаем
+  const skipParam = isNgrok ? "&ngrok-skip-browser-warning=1" : "";
+
+  const DEV_MODE = qs.get("dev") === "1";
+  const UID = qs.get("uid");
 
   async function loadHistory(offset=0, limit=20) {
-    const el = histEl;
-    el.innerHTML = '<div class="muted">Загружаю…</div>';
+    histEl.innerHTML = '<div class="muted">Загружаю…</div>';
 
-    let url = join('/api/history') + `?limit=${limit}&offset=${offset}`;
+    let url = join('/api/history') + `?limit=${limit}&offset=${offset}${skipParam}`;
     if (initData) url += `&initData=${encodeURIComponent(initData)}`;
     else if (DEV_MODE && UID) url += `&dev_user_id=${encodeURIComponent(UID)}`;
 
+    const fetchOpts = useHeader ? { headers: { 'ngrok-skip-browser-warning': 'true', 'Accept': 'application/json' },
+                                    mode: 'cors', credentials: 'omit', cache: 'no-store' }
+                                : { mode: 'cors', credentials: 'omit', cache: 'no-store' };
+
     dbg("fetch URL", url);
-
     try {
-      // 1) История
-      const res = await fetch(url, {
-        headers: { 'ngrok-skip-browser-warning': 'true' }  // 👈 важный заголовок
-      });
-
+      const res = await fetch(url, fetchOpts);
       const txt = await res.text();
       dbg("HTTP status", res.status + " " + res.statusText);
-      dbg("HTTP body", txt.slice(0, 500) + (txt.length>500 ? '…' : ''));
+      dbg("HTTP body (head)", txt.slice(0, 200));
 
       if (!res.ok) {
-        el.innerHTML = `<div class="muted">Ошибка: ${res.status} ${txt}</div>`;
+        histEl.innerHTML = `<div class="muted">Ошибка: ${res.status} ${txt}</div>`;
         return;
       }
-      const data = JSON.parse(txt); // парсим отдельно, чтобы увидеть сырой ответ в логе
-      el.innerHTML = "";
+
+      // Если вдруг опять HTML от ngrok — явно покажем
+      if (/^\s*</.test(txt)) {
+        histEl.innerHTML = `<div class="muted">Получен HTML вместо JSON (ngrok interstitial). Перезапустите туннель или откройте прямую ссылку в Safari один раз.</div>`;
+        return;
+      }
+
+      const data = JSON.parse(txt);
+      histEl.innerHTML = "";
 
       for (const t of data.items) {
         const dt = t.finished_at || t.created_at || "";
@@ -185,32 +192,36 @@
           </div>` : ""}
           ${t.error_text ? `<div style="color:#b00; margin-top:6px;">Ошибка: ${t.error_text}</div>` : ""}
         `;
-        el.appendChild(card);
+        histEl.appendChild(card);
       }
 
       if (!data.items.length) {
-        el.innerHTML = `<div class="muted">Пока пусто. Сгенерируйте картинку через /img в чате.</div>`;
+        histEl.innerHTML = `<div class="muted">Пока пусто. Сгенерируйте картинку через /img в чате.</div>`;
       }
 
-      // Открытие результата через пресайнер
-      el.querySelectorAll('button[data-task]').forEach(btn => {
+      // Кнопки "Открыть результат"
+      histEl.querySelectorAll('button[data-task]').forEach(btn => {
         btn.onclick = async () => {
-          let linkUrl = join(`/api/tasks/${btn.getAttribute('data-task')}/link`);
-          if (initData) linkUrl += `?initData=${encodeURIComponent(initData)}`;
-          else if (DEV_MODE && UID) linkUrl += `?dev_user_id=${encodeURIComponent(UID)}`;
-          dbg("fetch link", linkUrl);
+          let linkUrl = join(`/api/tasks/${btn.getAttribute('data-task')}/link`) + (skipParam ? `?${skipParam.slice(1)}` : "");
+          if (initData) linkUrl += (skipParam ? '&' : '?') + `initData=${encodeURIComponent(initData)}`;
+          else if (DEV_MODE && UID) linkUrl += (skipParam ? '&' : '?') + `dev_user_id=${encodeURIComponent(UID)}`;
 
+          const linkOpts = useHeader ? { headers: { 'ngrok-skip-browser-warning': 'true', 'Accept': 'application/json' },
+                                         mode: 'cors', credentials: 'omit', cache: 'no-store' }
+                                     : { mode: 'cors', credentials: 'omit', cache: 'no-store' };
+
+          dbg("fetch link", linkUrl);
           try {
-                  
-            // 2) Пресайнер /api/tasks/{id}/link
-            const r = await fetch(linkUrl, {
-              headers: { 'ngrok-skip-browser-warning': 'true' }  // 👈 тоже добавить
-            });
+            const r = await fetch(linkUrl, linkOpts);
             const body = await r.text();
             dbg("link status", r.status + " " + r.statusText);
-            dbg("link body", body.slice(0, 500) + (body.length>500 ? '…' : ''));
+            dbg("link body (head)", body.slice(0, 200));
             if (!r.ok) {
               return tgApp?.showAlert ? tgApp.showAlert(`Ошибка: ${r.status} ${body}`) : alert(`Ошибка: ${r.status} ${body}`);
+            }
+            if (/^\s*</.test(body)) {
+              return tgApp?.showAlert ? tgApp.showAlert("Получен HTML вместо JSON (ngrok interstitial).")
+                                      : alert("Получен HTML вместо JSON (ngrok interstitial).");
             }
             const { url } = JSON.parse(body);
             if (tgApp?.openLink) tgApp.openLink(url, { try_instant_view: false });
@@ -232,6 +243,7 @@
   loadHistory();
 })();
 </script>
+
 
 
 
