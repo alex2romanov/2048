@@ -68,7 +68,12 @@
   const tgApp = window.Telegram?.WebApp || null;
 
   const qs = new URLSearchParams(location.search);
-  const API_BASE = qs.get("api") || "https://kerry-stopped-singer-competitive.trycloudflare.com";
+  const API_BASE = new URLSearchParams(location.search).get("api");
+  if (!API_BASE) {
+    document.getElementById('hist').innerHTML = '<div class="muted">Не задан API. Откройте Mini App с параметром ?api=...</div>';
+    throw new Error("API_BASE missing");
+  }
+
   const DEV_MODE = qs.get("dev") === "1";
   const UID = qs.get("uid"); // для dev-режима
 
