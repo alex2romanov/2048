@@ -62,40 +62,34 @@
       <div id="hist" style="margin-top:10px"></div>
     </div>
   </div>
-
 <script>
 (function(){
   const tgApp = window.Telegram?.WebApp || null;
 
-  // 1) Надёжно читаем и валидируем api
+  // --- читаем и валидируем api ---
   const qs = new URLSearchParams(location.search);
-  const apiParamRaw = (qs.get("api") || "").trim();
+  const apiRaw = (qs.get("api") || "").trim();
+  const API_BASE = decodeURIComponent(apiRaw); // мы передаём его уже закодированным
 
-  let API_BASE = null;
-  try {
-    // Разрешаем как закодированный, так и незакодированный вариант
-    const parsed = new URL(apiParamRaw || decodeURIComponent(apiParamRaw));
-    // Берём только origin (без путей), чтобы избежать двойных слэшей и мусора
-    API_BASE = parsed.origin; // напр. "https://232a538d33.ngrok-free.app"
-  } catch (e) {
-    // Если api не передан или битый — показываем понятную ошибку и выходим
-    const hist = document.getElementById('hist');
-    if (hist) {
-      hist.innerHTML = '<div class="muted">Не задан или неверен параметр ?api=...<br>Откройте Mini App с параметром <code>?api=https%3A%2F%2F<sub>.ngrok-free.app</code></div>';
-    }
-    console.error('Bad API url param:', apiParamRaw, e);
+  function isGoodBase(u) {
+    return /^https:\/\/[A-Za-z0-9.-]+(?:\:[0-9]+)?(?:\/)?$/.test(u);
+  }
+
+  if (!API_BASE || !isGoodBase(API_BASE)) {
+    const el = document.getElementById('hist');
+    el.innerHTML = 'Не задан или неверен параметр <code>?api=...</code>.';
     return;
   }
 
-  // 2) Отладка initData
+  // хелпер для склейки
+  const join = (p) => API_BASE.replace(/\/+$/,'') + p;
+
+  // --- отладка initData ---
   const initData = tgApp?.initData || "";
   const u = tgApp?.initDataUnsafe?.user || {};
-  const whoEl = document.getElementById('who');
-  if (whoEl) {
-    whoEl.innerText = `Пользователь: ${u.first_name || ''} ${u.last_name || ''} (@${u.username || '—'}) • id=${u.id || '—'} • initData=${initData ? 'len=' + initData.length : 'empty'}`;
-  }
+  document.getElementById('who').innerText =
+    `Пользователь: ${u.first_name || ''} ${u.last_name || ''} (@${u.username || '—'}) • id=${u.id || '—'} • initData=${initData ? 'len='+initData.length : 'empty'}`;
 
-  // 3) Поддержка dev-режима в браузере
   const DEV_MODE = qs.get("dev") === "1";
   const UID = qs.get("uid");
 
@@ -103,63 +97,53 @@
     const el = document.getElementById('hist');
     el.innerHTML = '<div class="muted">Загружаю…</div>';
 
-    // Формируем URL при помощи base-аргумента — так надёжнее
-    const url = new URL('/api/history', API_BASE);
-    url.searchParams.set('limit', String(limit));
-    url.searchParams.set('offset', String(offset));
-
-    if (initData) {
-      // В WebView кладём initData в query (без заголовков)
-      url.searchParams.set('initData', initData);
-    } else if (DEV_MODE && UID) {
-      // В браузере без Telegram — dev-режим
-      url.searchParams.set('dev_user_id', UID);
-    }
+    // собираем URL руками (без конструктора URL)
+    let url = join('/api/history') + `?limit=${limit}&offset=${offset}`;
+    if (initData) url += `&initData=${encodeURIComponent(initData)}`;
+    else if (DEV_MODE && UID) url += `&dev_user_id=${encodeURIComponent(UID)}`;
 
     try {
-      const res = await fetch(url.toString());
+      const res = await fetch(url);
       if (!res.ok) {
         const txt = await res.text();
-        el.innerHTML = `<div class="muted">Ошибка: ${res.status} ${txt}<br/>Откройте Mini App внутри Telegram или добавьте ?dev=1&uid=&lt;ваш_id&gt; для теста.</div>`;
+        el.innerHTML = `<div class="muted">Ошибка: ${res.status} ${txt}</div>`;
         return;
       }
       const data = await res.json();
       el.innerHTML = "";
 
       for (const t of data.items) {
+        const dt = t.finished_at || t.created_at || "";
         const card = document.createElement('div');
         card.style.border = "1px solid #ccc";
         card.style.padding = "8px";
         card.style.borderRadius = "10px";
         card.style.margin = "8px 0";
-        const dt = t.finished_at || t.created_at || "";
         card.innerHTML = `
           <div><b>#${t.id}</b> — ${t.type} [${t.status}] ${t.progress ?? 0}%</div>
           <div class="muted"><small>${dt}</small></div>
-          ${
-            t.result_url ? `<div style="margin-top:6px;">
-              <button class="btn" style="padding:8px 12px;" data-task="${t.id}">Открыть результат</button>
-            </div>` : ""
-          }
+          ${t.result_url ? `<div style="margin-top:6px;">
+            <button class="btn" style="padding:8px 12px;" data-task="${t.id}">Открыть результат</button>
+          </div>` : ""}
           ${t.error_text ? `<div style="color:#b00; margin-top:6px;">Ошибка: ${t.error_text}</div>` : ""}
         `;
         el.appendChild(card);
       }
 
-      if (data.items.length === 0) {
+      if (!data.items.length) {
         el.innerHTML = `<div class="muted">Пока пусто. Сгенерируйте картинку через /img в чате.</div>`;
       }
 
-      // Открытие результата через пресайнер (если вы добавили /api/tasks/{id}/link)
+      // Открытие результата через пресайнер
       el.querySelectorAll('button[data-task]').forEach(btn => {
         btn.onclick = async () => {
           const taskId = btn.getAttribute('data-task');
-          const linkUrl = new URL(`/api/tasks/${taskId}/link`, API_BASE);
-          if (initData) linkUrl.searchParams.set('initData', initData);
-          else if (DEV_MODE && UID) linkUrl.searchParams.set('dev_user_id', UID);
+          let linkUrl = join(`/api/tasks/${taskId}/link`);
+          if (initData) linkUrl += `?initData=${encodeURIComponent(initData)}`;
+          else if (DEV_MODE && UID) linkUrl += `?dev_user_id=${encodeURIComponent(UID)}`;
 
           try {
-            const r = await fetch(linkUrl.toString());
+            const r = await fetch(linkUrl);
             if (!r.ok) {
               const txt = await r.text();
               return tgApp?.showAlert ? tgApp.showAlert(`Ошибка: ${r.status} ${txt}`) : alert(`Ошибка: ${r.status} ${txt}`);
@@ -174,8 +158,8 @@
       });
 
     } catch (e) {
-      el.innerHTML = `<div class="muted">Сетевая ошибка: ${e}</div>`;
       console.error(e);
+      el.innerHTML = `<div class="muted">Сетевая ошибка: ${e}</div>`;
     }
   }
 
@@ -183,6 +167,7 @@
   loadHistory();
 })();
 </script>
+
 
 <!-- Если у вас есть отдельный script.js, можно оставить, но следите, чтобы там не было второго "const tg = ..." -->
 <script src="./script.js?v=2" defer></script>
