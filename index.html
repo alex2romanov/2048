@@ -85,27 +85,25 @@
 
   // Тестовая покупка (без Stars): сразу начисляем кредиты выбранного тарифа
   const btnTest = document.getElementById('buyTest');
-  if (btnTest) {
-    btnTest.onclick = () => {
-      if (!tg) return alert('Откройте мини-приложение в Telegram');
-      const pack = currentPack();
-      tg.HapticFeedback?.impactOccurred?.('light');
-      tg.sendData(JSON.stringify({ action: 'buy_test', pack })); // обработает webapp_data_handler
-      tg.close();
-    };
-  }
-
-  // Реальная покупка: откроется инвойс Stars на выбранный тариф
-  const btnReal = document.getElementById('buyReal');
-  if (btnReal) {
-    btnReal.onclick = () => {
-      if (!tg) return alert('Откройте мини-приложение в Telegram');
-      const pack = currentPack();
-      tg.HapticFeedback?.impactOccurred?.('medium');
-      tg.sendData(JSON.stringify({ action: 'buy_real', pack })); // обработает webapp_data_handler
-      tg.close();
-    };
-  }
+  // buyTest
+  btnTest.onclick = () => {
+    if (!tg) return alert('Откройте мини-приложение в Telegram');
+    const pack = currentPack();
+    tg.HapticFeedback?.impactOccurred?.('light');
+    tg.sendData(JSON.stringify({ action: 'buy_test', pack }));
+    tg.showAlert('Запрос отправлен. Проверьте чат.');
+    // setTimeout(() => tg.close(), 600); // вернёшь после отладки
+  };
+  
+  // buyReal
+  btnReal.onclick = () => {
+    if (!tg) return alert('Откройте мини-приложение в Telegram');
+    const pack = currentPack();
+    tg.HapticFeedback?.impactOccurred?.('medium');
+    tg.sendData(JSON.stringify({ action: 'buy_real', pack }));
+    tg.showAlert('Готовлю счёт. Проверьте чат.');
+    // setTimeout(() => tg.close(), 600);
+  };
 })();
 </script>
 <script>
