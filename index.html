@@ -76,10 +76,12 @@
   </div>
 
   <!-- Панель отладки (под Историей можно вставить) -->
+  <!-- Панель отладки -->
   <div class="card" id="debugCard">
     <b>Debug</b>
-    <div id="debug" class="muted" style="white-space:pre-wrap; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px;"></div>
+    <div id="debug" class="muted" style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;"></div>
   </div>
+
 <script>
 (function(){
   const dbgEl = document.getElementById('debug');
@@ -90,87 +92,67 @@
       console.log('[MiniApp]', ...args);
       if (!dbgEl) return;
       const line = document.createElement('div');
-      line.textContent = args.map(x => 
-        (typeof x === 'object' ? JSON.stringify(x) : String(x))
-      ).join(' ');
+      line.textContent = args.map(x => (typeof x === 'object' ? JSON.stringify(x) : String(x))).join(' ');
       dbgEl.appendChild(line);
     } catch(e){}
   }
 
-  window.onerror = function(msg, src, line, col, err){
-    log('window.onerror:', msg, src, line+':'+col, err?.stack || '');
-  };
-  window.onunhandledrejection = function(ev){
-    log('unhandledrejection:', ev.reason || ev);
-  };
+  window.onerror = (msg, src, line, col, err) => log('window.onerror', msg, src, line+':'+col, err?.stack||'');
+  window.onunhandledrejection = ev => log('unhandledrejection', ev.reason||ev);
 
   log('tg?', !!tg, 'platform=', tg?.platform, 'ver=', tg?.version);
+  log('initData length =', tg?.initData?.length || 0);
 
-  function currentPack() {
-    const sel = document.getElementById('packSelect');
-    return sel ? sel.value : 'starter';
-  }
+  const who = document.getElementById('who');
+  const u = tg?.initDataUnsafe?.user || {};
+  if (who) who.innerText = `Пользователь: ${u.first_name||''} ${u.last_name||''} (@${u.username||'—'}) • id=${u.id||'—'} • initData=${tg?.initData ? 'len='+tg.initData.length : 'empty'}`;
+
+  tg?.ready?.(); tg?.expand?.();
+  tg?.onEvent?.('themeChanged', () => log('themeChanged'));
+  tg?.onEvent?.('viewportChanged', (e) => log('viewportChanged', JSON.stringify(e)));
+
+  function currentPack(){ return document.getElementById('packSelect')?.value || 'starter'; }
 
   // ТЕСТ-покупка
   const btnTest = document.getElementById('buyTest');
-  if (btnTest) {
-    btnTest.onclick = () => {
-      const pack = currentPack();
-      log('click buyTest pack=', pack);
-      if (!tg) { alert('Откройте мини-приложение в Telegram'); return; }
-      try {
-        tg.HapticFeedback?.impactOccurred?.('light');
-        const payload = { action: 'buy_test', pack };
-        log('sendData', payload);
-        tg.sendData(JSON.stringify(payload));
-        tg.showAlert('Запрос отправлен. Проверьте чат (buy_test).');
-        // tg.close(); // ОСТАВЬ закомментированным на время отладки!
-      } catch(e) {
-        log('sendData error', e);
-        tg?.showAlert?.('Ошибка sendData: ' + e);
-      }
-    };
-  }
+  if (btnTest) btnTest.onclick = () => {
+    const pack = currentPack();
+    log('click buyTest pack=', pack);
+    if (!tg) return alert('Откройте мини-приложение в Telegram');
+    try {
+      tg.HapticFeedback?.impactOccurred?.('light');
+      const payload = { action: 'buy_test', pack };
+      log('sendData', payload);
+      tg.sendData(JSON.stringify(payload));
+      tg.showAlert('Запрос отправлен. Проверьте чат (buy_test).');
+      // tg.close(); // на время отладки — НЕ закрываем
+    } catch(e) {
+      log('sendData error', e);
+      tg?.showAlert?.('Ошибка sendData: '+e);
+    }
+  };
 
-  // Реальная покупка (инвойс)
+  // Реальная покупка
   const btnReal = document.getElementById('buyReal');
-  if (btnReal) {
-    btnReal.onclick = () => {
-      const pack = currentPack();
-      log('click buyReal pack=', pack);
-      if (!tg) { alert('Откройте мини-приложение в Telegram'); return; }
-      try {
-        tg.HapticFeedback?.impactOccurred?.('medium');
-        const payload = { action: 'buy_real', pack };
-        log('sendData', payload);
-        tg.sendData(JSON.stringify(payload));
-        tg.showAlert('Готовлю счёт. Проверьте чат (buy_real).');
-        // tg.close(); // ОСТАВЬ закомментированным на время отладки!
-      } catch(e) {
-        log('sendData error', e);
-        tg?.showAlert?.('Ошибка sendData: ' + e);
-      }
-    };
-  }
-
-  // Немного доп. логов по WebApp
-  try {
-    tg?.ready?.();
-    tg?.expand?.();
-    tg?.onEvent?.('themeChanged', () => log('themeChanged'));
-    tg?.onEvent?.('viewportChanged', (e) => log('viewportChanged', e));
-  } catch(e) {
-    log('tg init error', e);
-  }
-
-  // Видно, кто зашёл
-  const u = tg?.initDataUnsafe?.user || {};
-  const who = document.getElementById('who');
-  if (who) who.innerText = `Пользователь: ${u.first_name||''} ${u.last_name||''} (@${u.username||'—'}) • id=${u.id||'—'} • initData=${tg?.initData ? 'len='+tg.initData.length : 'empty'}`;
-  log('initData length =', tg?.initData?.length || 0);
-
+  if (btnReal) btnReal.onclick = () => {
+    const pack = currentPack();
+    log('click buyReal pack=', pack);
+    if (!tg) return alert('Откройте мини-приложение в Telegram');
+    try {
+      tg.HapticFeedback?.impactOccurred?.('medium');
+      const payload = { action: 'buy_real', pack };
+      log('sendData', payload);
+      tg.sendData(JSON.stringify(payload));
+      tg.showAlert('Готовлю счёт. Проверьте чат (buy_real).');
+      // tg.close(); // на время отладки — НЕ закрываем
+    } catch(e) {
+      log('sendData error', e);
+      tg?.showAlert?.('Ошибка sendData: '+e);
+    }
+  };
 })();
 </script>
+
 <script>
 (async function(){
   const tgApp = window.Telegram?.WebApp || null;
