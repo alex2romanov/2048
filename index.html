@@ -67,46 +67,65 @@
 (function(){
   const tgApp = window.Telegram?.WebApp || null;
 
+  // 1) Надёжно читаем и валидируем api
   const qs = new URLSearchParams(location.search);
-  const API_BASE = new URLSearchParams(location.search).get("api");
-  if (!API_BASE) {
-    document.getElementById('hist').innerHTML = '<div class="muted">Не задан API. Откройте Mini App с параметром ?api=...</div>';
-    throw new Error("API_BASE missing");
+  const apiParamRaw = (qs.get("api") || "").trim();
+
+  let API_BASE = null;
+  try {
+    // Разрешаем как закодированный, так и незакодированный вариант
+    const parsed = new URL(apiParamRaw || decodeURIComponent(apiParamRaw));
+    // Берём только origin (без путей), чтобы избежать двойных слэшей и мусора
+    API_BASE = parsed.origin; // напр. "https://232a538d33.ngrok-free.app"
+  } catch (e) {
+    // Если api не передан или битый — показываем понятную ошибку и выходим
+    const hist = document.getElementById('hist');
+    if (hist) {
+      hist.innerHTML = '<div class="muted">Не задан или неверен параметр ?api=...<br>Откройте Mini App с параметром <code>?api=https%3A%2F%2F<sub>.ngrok-free.app</code></div>';
+    }
+    console.error('Bad API url param:', apiParamRaw, e);
+    return;
   }
 
-  const DEV_MODE = qs.get("dev") === "1";
-  const UID = qs.get("uid"); // для dev-режима
-
-  // Показать отладку: длину initData
+  // 2) Отладка initData
   const initData = tgApp?.initData || "";
   const u = tgApp?.initDataUnsafe?.user || {};
-  document.getElementById('who').innerText =
-    `Пользователь: ${u.first_name || ''} ${u.last_name || ''} (@${u.username || '—'}) • id=${u.id || '—'} • initData=${initData ? 'len=' + initData.length : 'empty'}`;
+  const whoEl = document.getElementById('who');
+  if (whoEl) {
+    whoEl.innerText = `Пользователь: ${u.first_name || ''} ${u.last_name || ''} (@${u.username || '—'}) • id=${u.id || '—'} • initData=${initData ? 'len=' + initData.length : 'empty'}`;
+  }
+
+  // 3) Поддержка dev-режима в браузере
+  const DEV_MODE = qs.get("dev") === "1";
+  const UID = qs.get("uid");
 
   async function loadHistory(offset=0, limit=20) {
     const el = document.getElementById('hist');
     el.innerHTML = '<div class="muted">Загружаю…</div>';
 
-    // Собираем URL. Внутри Telegram кладём initData в query,
-    // В dev-режиме — dev_user_id.
-    const url = new URL(`${API_BASE}/api/history`);
+    // Формируем URL при помощи base-аргумента — так надёжнее
+    const url = new URL('/api/history', API_BASE);
     url.searchParams.set('limit', String(limit));
     url.searchParams.set('offset', String(offset));
+
     if (initData) {
-      url.searchParams.set('initData', initData);         // 👈 вот так
+      // В WebView кладём initData в query (без заголовков)
+      url.searchParams.set('initData', initData);
     } else if (DEV_MODE && UID) {
+      // В браузере без Telegram — dev-режим
       url.searchParams.set('dev_user_id', UID);
     }
 
     try {
-      const res = await fetch(url.toString());            // ⬅️ без headers
+      const res = await fetch(url.toString());
       if (!res.ok) {
         const txt = await res.text();
-        el.innerHTML = `<div class="muted">Ошибка: ${res.status} ${txt}<br/>Откройте Mini App внутри Telegram или добавьте ?dev=1&uid=<ваш_id> для теста.</div>`;
+        el.innerHTML = `<div class="muted">Ошибка: ${res.status} ${txt}<br/>Откройте Mini App внутри Telegram или добавьте ?dev=1&uid=&lt;ваш_id&gt; для теста.</div>`;
         return;
       }
       const data = await res.json();
       el.innerHTML = "";
+
       for (const t of data.items) {
         const card = document.createElement('div');
         card.style.border = "1px solid #ccc";
@@ -119,28 +138,44 @@
           <div class="muted"><small>${dt}</small></div>
           ${
             t.result_url ? `<div style="margin-top:6px;">
-              <button class="btn" style="padding:8px 12px;" data-url="${t.result_url}">Открыть результат</button>
+              <button class="btn" style="padding:8px 12px;" data-task="${t.id}">Открыть результат</button>
             </div>` : ""
           }
           ${t.error_text ? `<div style="color:#b00; margin-top:6px;">Ошибка: ${t.error_text}</div>` : ""}
         `;
         el.appendChild(card);
       }
+
       if (data.items.length === 0) {
         el.innerHTML = `<div class="muted">Пока пусто. Сгенерируйте картинку через /img в чате.</div>`;
       }
 
-      // Кнопка для открытия файла в WebView
-      el.querySelectorAll('button[data-url]').forEach(btn => {
-        btn.onclick = () => {
-          const url = btn.getAttribute('data-url');
-          if (tgApp?.openLink) tgApp.openLink(url, { try_instant_view: false });
-          else window.open(url, '_blank', 'noopener');
+      // Открытие результата через пресайнер (если вы добавили /api/tasks/{id}/link)
+      el.querySelectorAll('button[data-task]').forEach(btn => {
+        btn.onclick = async () => {
+          const taskId = btn.getAttribute('data-task');
+          const linkUrl = new URL(`/api/tasks/${taskId}/link`, API_BASE);
+          if (initData) linkUrl.searchParams.set('initData', initData);
+          else if (DEV_MODE && UID) linkUrl.searchParams.set('dev_user_id', UID);
+
+          try {
+            const r = await fetch(linkUrl.toString());
+            if (!r.ok) {
+              const txt = await r.text();
+              return tgApp?.showAlert ? tgApp.showAlert(`Ошибка: ${r.status} ${txt}`) : alert(`Ошибка: ${r.status} ${txt}`);
+            }
+            const { url } = await r.json();
+            if (tgApp?.openLink) tgApp.openLink(url, { try_instant_view: false });
+            else window.open(url, '_blank', 'noopener');
+          } catch (e) {
+            tgApp?.showAlert ? tgApp.showAlert(`Сетевая ошибка: ${e}`) : alert(`Сетевая ошибка: ${e}`);
+          }
         };
       });
 
     } catch (e) {
       el.innerHTML = `<div class="muted">Сетевая ошибка: ${e}</div>`;
+      console.error(e);
     }
   }
 
