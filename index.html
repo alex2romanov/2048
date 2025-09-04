@@ -29,12 +29,24 @@
 
     <div class="card">
       <b>Кредиты</b>
-      <div class="muted" style="margin-top:6px">Покупка тестовая — без списания Stars (бот должен поддерживать STARS_TEST).</div>
-      <div class="row">
-        <button class="btn" id="buyTest">Пополнить 500 (тест)</button>
-        <button class="btn-outline" id="buyReal">Купить 500 ⭐</button>
+      <div class="muted" style="margin-top:6px">
+        Выберите тариф и оплатите через Telegram Stars. В тестовом режиме — кредиты начисляются сразу.
+      </div>
+    
+      <div class="row" style="margin-top:10px">
+        <select id="packSelect" style="flex:1; padding:10px; border-radius:10px; border:1px solid #ddd">
+          <option value="starter">Starter — 100 кредитов</option>
+          <option value="pro">Pro — 300 кредитов (-10%)</option>
+          <option value="max">Max — 1000 кредитов (-20%)</option>
+        </select>
+        <button class="btn" id="buyReal">Купить ⭐</button>
+      </div>
+    
+      <div class="row" style="margin-top:8px">
+        <button class="btn-outline" id="buyTest">Пополнить (тест)</button>
       </div>
     </div>
+
 
     <div class="card">
       <b>Модель</b>
@@ -62,6 +74,40 @@
       <div id="hist" style="margin-top:10px"></div>
     </div>
   </div>
+<script>
+(function(){
+  const tg = window.Telegram?.WebApp;
+
+  function currentPack() {
+    const sel = document.getElementById('packSelect');
+    return sel ? sel.value : 'starter';
+  }
+
+  // Тестовая покупка (без Stars): сразу начисляем кредиты выбранного тарифа
+  const btnTest = document.getElementById('buyTest');
+  if (btnTest) {
+    btnTest.onclick = () => {
+      if (!tg) return alert('Откройте мини-приложение в Telegram');
+      const pack = currentPack();
+      tg.HapticFeedback?.impactOccurred?.('light');
+      tg.sendData(JSON.stringify({ action: 'buy_test', pack })); // обработает webapp_data_handler
+      tg.close();
+    };
+  }
+
+  // Реальная покупка: откроется инвойс Stars на выбранный тариф
+  const btnReal = document.getElementById('buyReal');
+  if (btnReal) {
+    btnReal.onclick = () => {
+      if (!tg) return alert('Откройте мини-приложение в Telegram');
+      const pack = currentPack();
+      tg.HapticFeedback?.impactOccurred?.('medium');
+      tg.sendData(JSON.stringify({ action: 'buy_real', pack })); // обработает webapp_data_handler
+      tg.close();
+    };
+  }
+})();
+</script>
 <script>
 (async function(){
   const tgApp = window.Telegram?.WebApp || null;
