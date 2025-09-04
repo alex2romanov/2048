@@ -154,7 +154,11 @@
     dbg("fetch URL", url);
 
     try {
-      const res = await fetch(url);
+      // 1) История
+      const res = await fetch(url, {
+        headers: { 'ngrok-skip-browser-warning': 'true' }  // 👈 важный заголовок
+      });
+
       const txt = await res.text();
       dbg("HTTP status", res.status + " " + res.statusText);
       dbg("HTTP body", txt.slice(0, 500) + (txt.length>500 ? '…' : ''));
@@ -197,7 +201,11 @@
           dbg("fetch link", linkUrl);
 
           try {
-            const r = await fetch(linkUrl);
+                  
+            // 2) Пресайнер /api/tasks/{id}/link
+            const r = await fetch(linkUrl, {
+              headers: { 'ngrok-skip-browser-warning': 'true' }  // 👈 тоже добавить
+            });
             const body = await r.text();
             dbg("link status", r.status + " " + r.statusText);
             dbg("link body", body.slice(0, 500) + (body.length>500 ? '…' : ''));
