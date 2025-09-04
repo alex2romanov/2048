@@ -66,50 +66,104 @@
 (function(){
   const tgApp = window.Telegram?.WebApp || null;
 
-  // --- читаем и валидируем api ---
-  const qs = new URLSearchParams(location.search);
-  const apiRaw = (qs.get("api") || "").trim();
-  const API_BASE = decodeURIComponent(apiRaw); // мы передаём его уже закодированным
+  // --- Диагностическая панель ---
+  const histEl = document.getElementById('hist');
+  const dbg = (label, value) => {
+    console.log(label, value);
+    const div = document.createElement('div');
+    div.className = 'muted';
+    div.style.whiteSpace = 'pre-wrap';
+    div.textContent = `${label}: ${value}`;
+    histEl.appendChild(div);
+  };
 
+  dbg("location.href", location.href);
+  dbg("document.referrer", document.referrer || "(empty)");
+
+  // --- Достаём api несколькими способами ---
+  const search = location.search.startsWith('?') ? location.search.slice(1) : location.search;
+  const qs = new URLSearchParams(search);
+  const apiRaw = (qs.get("api") || "").trim();
+  dbg("apiRaw (from search)", apiRaw);
+
+  // иногда люди передают api не в search, а в hash — на всякий случай попробуем и там
+  let apiHashRaw = "";
+  if (location.hash.includes("api=")) {
+    const h = location.hash.replace(/^#/, "");
+    const hqs = new URLSearchParams(h);
+    apiHashRaw = (hqs.get("api") || "").trim();
+    dbg("apiRaw (from hash)", apiHashRaw);
+  }
+
+  // Выбираем то, что нашли первым
+  const apiCandidate = apiRaw || apiHashRaw;
+  dbg("apiCandidate before decode", apiCandidate);
+
+  // Пробуем аккуратно декодировать (вдруг дважды кодировали)
+  let decoded1 = "";
+  let decoded2 = "";
+  try { decoded1 = decodeURIComponent(apiCandidate); } catch (e) { decoded1 = "(decode1 failed)"; }
+  try { decoded2 = decodeURIComponent(decoded1); } catch (e) { decoded2 = "(decode2 failed)"; }
+  dbg("decoded1", decoded1);
+  dbg("decoded2", decoded2);
+
+  // Выбираем адекватный вариант
+  const API_BASE = /^https:\/\//.test(decoded2) ? decoded2
+                   : /^https:\/\//.test(decoded1) ? decoded1
+                   : apiCandidate;
+
+  dbg("API_BASE chosen", API_BASE);
+
+  // Валидация (разрешаем trailing слэш, но без пути)
   function isGoodBase(u) {
-    return /^https:\/\/[A-Za-z0-9.-]+(?:\:[0-9]+)?(?:\/)?$/.test(u);
+    return /^https:\/\/[A-Za-z0-9.-]+(?::\d+)?\/?$/.test(u);
   }
 
   if (!API_BASE || !isGoodBase(API_BASE)) {
-    const el = document.getElementById('hist');
-    el.innerHTML = 'Не задан или неверен параметр <code>?api=...</code>.';
+    histEl.innerHTML = `
+      <div class="muted">
+        Не задан или неверен параметр <code>?api=...</code>.<br>
+        <b>Что пришло:</b><br>
+        apiRaw=${apiRaw || "(empty)"}<br>
+        decoded1=${decoded1}<br>
+        decoded2=${decoded2}<br>
+      </div>`;
     return;
   }
 
-  // хелпер для склейки
+  // Склейка без new URL
   const join = (p) => API_BASE.replace(/\/+$/,'') + p;
 
-  // --- отладка initData ---
+  // --- initData от Telegram ---
   const initData = tgApp?.initData || "";
   const u = tgApp?.initDataUnsafe?.user || {};
   document.getElementById('who').innerText =
     `Пользователь: ${u.first_name || ''} ${u.last_name || ''} (@${u.username || '—'}) • id=${u.id || '—'} • initData=${initData ? 'len='+initData.length : 'empty'}`;
 
-  const DEV_MODE = qs.get("dev") === "1";
-  const UID = qs.get("uid");
+  const DEV_MODE = (new URLSearchParams(location.search)).get("dev") === "1";
+  const UID = (new URLSearchParams(location.search)).get("uid");
 
   async function loadHistory(offset=0, limit=20) {
-    const el = document.getElementById('hist');
+    const el = histEl;
     el.innerHTML = '<div class="muted">Загружаю…</div>';
 
-    // собираем URL руками (без конструктора URL)
     let url = join('/api/history') + `?limit=${limit}&offset=${offset}`;
     if (initData) url += `&initData=${encodeURIComponent(initData)}`;
     else if (DEV_MODE && UID) url += `&dev_user_id=${encodeURIComponent(UID)}`;
 
+    dbg("fetch URL", url);
+
     try {
       const res = await fetch(url);
+      const txt = await res.text();
+      dbg("HTTP status", res.status + " " + res.statusText);
+      dbg("HTTP body", txt.slice(0, 500) + (txt.length>500 ? '…' : ''));
+
       if (!res.ok) {
-        const txt = await res.text();
         el.innerHTML = `<div class="muted">Ошибка: ${res.status} ${txt}</div>`;
         return;
       }
-      const data = await res.json();
+      const data = JSON.parse(txt); // парсим отдельно, чтобы увидеть сырой ответ в логе
       el.innerHTML = "";
 
       for (const t of data.items) {
@@ -137,21 +191,24 @@
       // Открытие результата через пресайнер
       el.querySelectorAll('button[data-task]').forEach(btn => {
         btn.onclick = async () => {
-          const taskId = btn.getAttribute('data-task');
-          let linkUrl = join(`/api/tasks/${taskId}/link`);
+          let linkUrl = join(`/api/tasks/${btn.getAttribute('data-task')}/link`);
           if (initData) linkUrl += `?initData=${encodeURIComponent(initData)}`;
           else if (DEV_MODE && UID) linkUrl += `?dev_user_id=${encodeURIComponent(UID)}`;
+          dbg("fetch link", linkUrl);
 
           try {
             const r = await fetch(linkUrl);
+            const body = await r.text();
+            dbg("link status", r.status + " " + r.statusText);
+            dbg("link body", body.slice(0, 500) + (body.length>500 ? '…' : ''));
             if (!r.ok) {
-              const txt = await r.text();
-              return tgApp?.showAlert ? tgApp.showAlert(`Ошибка: ${r.status} ${txt}`) : alert(`Ошибка: ${r.status} ${txt}`);
+              return tgApp?.showAlert ? tgApp.showAlert(`Ошибка: ${r.status} ${body}`) : alert(`Ошибка: ${r.status} ${body}`);
             }
-            const { url } = await r.json();
+            const { url } = JSON.parse(body);
             if (tgApp?.openLink) tgApp.openLink(url, { try_instant_view: false });
             else window.open(url, '_blank', 'noopener');
           } catch (e) {
+            console.error(e);
             tgApp?.showAlert ? tgApp.showAlert(`Сетевая ошибка: ${e}`) : alert(`Сетевая ошибка: ${e}`);
           }
         };
@@ -159,7 +216,7 @@
 
     } catch (e) {
       console.error(e);
-      el.innerHTML = `<div class="muted">Сетевая ошибка: ${e}</div>`;
+      histEl.insertAdjacentHTML('beforeend', `<div class="muted">EXC: ${String(e)}</div>`);
     }
   }
 
@@ -167,6 +224,7 @@
   loadHistory();
 })();
 </script>
+
 
 
 <!-- Если у вас есть отдельный script.js, можно оставить, но следите, чтобы там не было второго "const tg = ..." -->
