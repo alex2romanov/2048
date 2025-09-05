@@ -94,9 +94,13 @@
   document.getElementById('pingBtn').onclick = () => {
     const tg = window.tg || window.Telegram?.WebApp;
     if (!tg) return alert('tg не инициализирован');
-    tg.sendData(JSON.stringify({action: 'ping', t: Date.now()}));
+    if (!tg.initData || tg.initData.length === 0) {
+      return alert('initData пуст — откройте Mini App из чата по кнопке.');
+    }
+    tg.sendData(JSON.stringify({ action: 'ping', t: Date.now() }));
     tg.showAlert?.('sendData(ping) отправлен');
   };
+
 
 
   function log(...args){
