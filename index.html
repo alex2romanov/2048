@@ -132,13 +132,8 @@
 
   function currentPack(){ return document.getElementById('packSelect')?.value || 'starter'; }
 
-  // Хелперы
+    // помощники
   const hasInitData = () => tg && tg.initData && tg.initData.length > 0;
-  const afterSend = (msg) => {
-    try { tg.showAlert?.(msg); } catch(_) {}
-    // iOS часто отправляет web_app_data только после закрытия WebApp
-    setTimeout(() => { try { tg.close?.(); } catch(_) {} }, 80);
-  };
   
   // Пополнение (тест)
   const btnTest = document.getElementById('buyTest');
@@ -148,7 +143,7 @@
   
     if (!tg) return alert('Откройте мини-приложение внутри Telegram.');
     if (!hasInitData()) {
-      return tg.showAlert?.('initData не получен. Откройте Mini App из чата кнопкой, не в браузере.');
+      return tg.showAlert?.('initData не получен. Откройте Mini App из чата кнопкой.');
     }
   
     try {
@@ -158,7 +153,10 @@
       const payload = { action: 'buy_test', pack };
       log('sendData', payload);
       tg.sendData(JSON.stringify(payload));
-      afterSend('Запрос отправлен. Проверьте чат (buy_test).');
+  
+      // ← КЛЮЧЕВОЕ: закрываем сразу (iOS тогда шлёт web_app_data)
+      try { tg.showAlert?.('Запрос отправлен. Проверьте чат (buy_test).'); } catch(_) {}
+      try { tg.close?.(); } catch(_) {}
     } catch (e) {
       log('sendData error', e);
       tg.showAlert?.('Ошибка sendData: ' + e);
@@ -173,7 +171,7 @@
   
     if (!tg) return alert('Откройте мини-приложение внутри Telegram.');
     if (!hasInitData()) {
-      return tg.showAlert?.('initData не получен. Откройте Mini App из чата кнопкой, не в браузере.');
+      return tg.showAlert?.('initData не получен. Откройте Mini App из чата кнопкой.');
     }
   
     try {
@@ -183,12 +181,16 @@
       const payload = { action: 'buy_real', pack };
       log('sendData', payload);
       tg.sendData(JSON.stringify(payload));
-      afterSend('Готовлю счёт. Проверьте чат (buy_real).');
+  
+      // ← КЛЮЧЕВОЕ
+      try { tg.showAlert?.('Готовлю счёт. Проверьте чат (buy_real).'); } catch(_) {}
+      try { tg.close?.(); } catch(_) {}
     } catch (e) {
       log('sendData error', e);
       tg.showAlert?.('Ошибка sendData: ' + e);
     }
   };
+
 
 
 })();
