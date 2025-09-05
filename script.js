@@ -34,14 +34,23 @@
     document.getElementById("applyModel").onclick = () => {
       const id = modelSelect.value;
       const label = (MODELS.find(m => m.id === id) || {}).label || id;
+    
+      if (!tg) return alert('Откройте мини-приложение внутри Telegram.');
+      if (!hasInitData()) {
+        return tg.showAlert?.('initData не получен. Откройте Mini App из чата кнопкой.');
+      }
+    
       try {
-        tg.HapticFeedback?.impactOccurred?.("rigid");
-      } catch(_) {}
-      tg.sendData(JSON.stringify({ action: "set_model", model_id: id, label }));
-      // На время отладки лучше НЕ закрывать:
-      // tg.close();
-      alert(`Запрос отправлен боту: ${label}`);
+        tg.HapticFeedback?.impactOccurred?.('rigid');
+        tg.sendData(JSON.stringify({ action: "set_model", model_id: id, label }));
+    
+        try { tg.showAlert?.('Модель отправлена. Проверьте чат.'); } catch(_) {}
+        try { tg.close?.(); } catch(_) {}
+      } catch (e) {
+        tg.showAlert?.('Ошибка sendData: ' + e);
+      }
     };
+
   };
 
   if (document.readyState === "loading") {
