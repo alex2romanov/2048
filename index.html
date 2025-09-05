@@ -86,6 +86,7 @@
 (function(){
   const dbgEl = document.getElementById('debug');
   const tg = window.Telegram?.WebApp;
+  window.tg = tg;
 
   function log(...args){
     try {
