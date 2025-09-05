@@ -88,6 +88,17 @@
   const tg = window.Telegram?.WebApp;
   window.tg = tg;
 
+    // Где-нибудь после window.tg
+  document.body.insertAdjacentHTML('beforeend',
+    '<div style="padding:12px;"><button id="pingBtn">sendData PING</button></div>');
+  document.getElementById('pingBtn').onclick = () => {
+    const tg = window.tg || window.Telegram?.WebApp;
+    if (!tg) return alert('tg не инициализирован');
+    tg.sendData(JSON.stringify({action: 'ping', t: Date.now()}));
+    tg.showAlert?.('sendData(ping) отправлен');
+  };
+
+
   function log(...args){
     try {
       console.log('[MiniApp]', ...args);
