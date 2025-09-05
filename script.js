@@ -30,26 +30,28 @@
       opt.textContent = m.label;
       modelSelect.appendChild(opt);
     });
-
-    document.getElementById("applyModel").onclick = () => {
+    
+    document.getElementById('applyModel').onclick = async () => {
       const id = modelSelect.value;
       const label = (MODELS.find(m => m.id === id) || {}).label || id;
     
       if (!tg) return alert('Откройте мини-приложение внутри Telegram.');
-      if (!hasInitData()) {
-        return tg.showAlert?.('initData не получен. Откройте Mini App из чата кнопкой.');
+      const ok = await ensureInitData(4000);
+      if (!ok) {
+        tg?.showAlert?.('initData ещё не пришёл. Откройте Mini App из чата и подождите секунду, затем попробуйте снова.');
+        return;
       }
     
       try {
         tg.HapticFeedback?.impactOccurred?.('rigid');
         tg.sendData(JSON.stringify({ action: "set_model", model_id: id, label }));
-    
-        try { tg.showAlert?.('Модель отправлена. Проверьте чат.'); } catch(_) {}
-        try { tg.close?.(); } catch(_) {}
+        tg?.showAlert?.('Модель отправлена. Проверьте чат.');
+        closeSoon(120);
       } catch (e) {
-        tg.showAlert?.('Ошибка sendData: ' + e);
+        tg?.showAlert?.('Ошибка sendData: ' + e);
       }
     };
+
 
   };
 
