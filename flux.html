@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FLUX Schnell — настройки</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root { --bg:#fff; --text:#111; --card:#f2f3f5; --accent:#0a84ff; --muted:#6b7280; --radius:14px; }
+    body { margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { padding:16px; max-width:640px; margin:0 auto; }
+    .card { background:var(--card); border-radius:var(--radius); padding:16px; margin-top:12px; }
+    h1 { font-size:20px; margin:0 0 6px; }
+    .muted { color:var(--muted); font-size:14px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
+    .btn { appearance:none; border:none; border-radius:12px; padding:12px 16px; font-size:16px; cursor:pointer; background:var(--accent); color:#fff; }
+    select { flex:1; padding:10px; border-radius:10px; border:1px solid #ddd; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>FLUX Schnell — aspect ratio</h1>
+      <div class="muted">Выберите соотношение сторон и примените.</div>
+      <div class="row">
+        <select id="fluxAR">
+          <option>1:1</option>
+          <option>16:9</option>
+          <option>21:9</option>
+          <option>3:2</option>
+          <option>2:3</option>
+        </select>
+        <button class="btn" id="applyFlux">Применить</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const tg = window.Telegram?.WebApp; if (!tg) return;
+      tg.ready(); tg.expand?.();
+
+      // Тема из Telegram
+      const s = tg.themeParams || {};
+      document.documentElement.style.setProperty('--bg',    s.bg_color           || '#ffffff');
+      document.documentElement.style.setProperty('--text',  s.text_color         || '#111111');
+      document.documentElement.style.setProperty('--card',  s.secondary_bg_color || '#f2f3f5');
+      document.documentElement.style.setProperty('--accent',s.button_color       || '#0a84ff');
+      document.documentElement.style.setProperty('--muted', s.hint_color         || '#6b7280');
+
+      document.getElementById('applyFlux').onclick = () => {
+        const ar = document.getElementById('fluxAR').value;
+        tg.HapticFeedback?.impactOccurred?.('light');
+        tg.sendData(JSON.stringify({ action: "set_flux_opts", aspect_ratio: ar }));
+        tg.showAlert('Параметры FLUX отправлены');
+        setTimeout(() => tg.close(), 600);
+      };
+    })();
+  </script>
+</body>
+</html>
