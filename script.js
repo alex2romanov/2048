@@ -43,7 +43,7 @@
         tg.HapticFeedback?.impactOccurred?.('rigid');
         tg.sendData(JSON.stringify({ action: "set_model", model_id: id, label }));
         tg?.showAlert?.('Модель отправлена. Проверьте чат.');
-        setTimeout(() => tg?.close?.(), 120);
+        setTimeout(() => tg?.close?.(), 600);
       } catch (e) {
         tg?.showAlert?.('Ошибка sendData: ' + e);
       }
