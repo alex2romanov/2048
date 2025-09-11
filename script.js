@@ -7,6 +7,8 @@
       alert("Откройте Mini App внутри Telegram, иначе выбор модели не сработает.");
       return;
     }
+    if (location.hash === "#flux") document.getElementById('flux-card')?.scrollIntoView({behavior:"smooth"});
+
 
     const MODELS = [
       {"id": "openai/gpt-4o-mini", "label": "GPT-4o Mini"},
@@ -46,6 +48,17 @@
         tg?.showAlert?.('Ошибка sendData: ' + e);
       }
     };
+    const btnFlux = document.getElementById('applyFlux');
+    if (btnFlux) {
+      btnFlux.onclick = () => {
+        const ar = document.getElementById('fluxAR').value;
+        tg.HapticFeedback?.impactOccurred?.('light');
+        tg.sendData(JSON.stringify({ action: "set_flux_opts", aspect_ratio: ar }));
+        tg?.showAlert?.('Параметры FLUX отправлены');
+        setTimeout(() => tg?.close?.(), 600);
+      };
+    }
+
 
 
 
