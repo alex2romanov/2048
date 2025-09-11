@@ -35,15 +35,13 @@
       const id = modelSelect.value;
       const label = (MODELS.find(m => m.id === id) || {}).label || id;
     
-      if (!tg?.initDataUnsafe?.user?.id) {
-        tg?.showAlert?.('Откройте Mini App из чата с ботом.');
-        return;
-      }
+      const uid = tg?.initDataUnsafe?.user?.id;
+      if (!uid) tg?.showAlert?.('initData пустой — всё равно отправляю.');
       try {
         tg.HapticFeedback?.impactOccurred?.('rigid');
         tg.sendData(JSON.stringify({ action: "set_model", model_id: id, label }));
         tg?.showAlert?.('Модель отправлена. Проверьте чат.');
-        setTimeout(() => tg?.close?.(), 600);
+        setTimeout(() => tg?.close?.(), 800);
       } catch (e) {
         tg?.showAlert?.('Ошибка sendData: ' + e);
       }
