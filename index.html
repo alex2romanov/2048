@@ -66,6 +66,8 @@
 (function(){
   const tg = window.Telegram.WebApp;
   window.tg = tg; 
+  tg.ready();
+  tg.expand();
   // Тема Telegram
   function applyTheme(){
     const s = tg.colorScheme === 'dark' ? tg.themeParams : tg.themeParams;
