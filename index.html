@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>MVP Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
       --bg: #ffffff; --text: #111111; --card: #f2f3f5; --accent: #0a84ff; --muted: #6b7280;
@@ -103,14 +104,14 @@
 
   document.getElementById('close').onclick = () => tg.close();
 })();
+</script>
 <section id="history">
   <h2>История</h2>
   <button id="btnLoad">Обновить</button>
   <div id="hist"></div>
 </section>
   
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="./script.js?v=2" defer></script>
+<script src="./script.js?v=3" defer></script>
 </body>
 </html>
 
