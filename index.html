@@ -68,14 +68,14 @@
   window.tg = tg; 
   tg.ready();
   tg.expand();
-  function parseUserFromInitData() {
-    try {
-      // 1) прямой доступ (нормальный случай)
-      const u1 = tg.initDataUnsafe?.user;
-      if (u1 && u1.id) return u1;
+  function parseUser() {
+    // 1) обычный путь
+    const u1 = tg?.initDataUnsafe?.user;
+    if (u1 && u1.id) return u1;
 
-      // 2) парсим строку initData (часто помогает)
-      const s = tg.initData || "";
+    // 2) из initData-строки
+    try {
+      const s = tg?.initData || "";
       if (s) {
         const q = new URLSearchParams(s);
         const uJson = q.get("user");
@@ -84,12 +84,24 @@
           if (u2 && u2.id) return u2;
         }
       }
-    } catch (e) { /* ignore */ }
+    } catch {}
+
+    // 3) из URL (передали с бэка)
+    const qp = new URLSearchParams(location.search);
+    const uid = qp.get("uid");
+    if (uid) {
+      return {
+        id: Number(uid),
+        first_name: qp.get("first_name") || "",
+        last_name: qp.get("last_name") || "",
+        username: qp.get("username") || "",
+      };
+    }
     return null;
   }
 
-  function renderWho() {
-    const u = parseUserFromInitData();
+  function renderWho(){
+    const u = parseUser();
     const el = document.getElementById('who');
     if (u) {
       el.innerText = `Пользователь: ${u.first_name||''} ${u.last_name||''} (@${u.username||'—'}) • id=${u.id}`;
@@ -99,7 +111,6 @@
   }
 
   renderWho();
-  // небольшой повтор через тик — на всякий, если данные инициализировались с задержкой
   setTimeout(renderWho, 300);
   // Тема Telegram
   function applyTheme(){
