@@ -68,6 +68,39 @@
   window.tg = tg; 
   tg.ready();
   tg.expand();
+  function parseUserFromInitData() {
+    try {
+      // 1) прямой доступ (нормальный случай)
+      const u1 = tg.initDataUnsafe?.user;
+      if (u1 && u1.id) return u1;
+
+      // 2) парсим строку initData (часто помогает)
+      const s = tg.initData || "";
+      if (s) {
+        const q = new URLSearchParams(s);
+        const uJson = q.get("user");
+        if (uJson) {
+          const u2 = JSON.parse(uJson);
+          if (u2 && u2.id) return u2;
+        }
+      }
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+
+  function renderWho() {
+    const u = parseUserFromInitData();
+    const el = document.getElementById('who');
+    if (u) {
+      el.innerText = `Пользователь: ${u.first_name||''} ${u.last_name||''} (@${u.username||'—'}) • id=${u.id}`;
+    } else {
+      el.innerText = 'Пользователь неизвестен • откройте мини-апп из приватного чата с ботом';
+    }
+  }
+
+  renderWho();
+  // небольшой повтор через тик — на всякий, если данные инициализировались с задержкой
+  setTimeout(renderWho, 300);
   // Тема Telegram
   function applyTheme(){
     const s = tg.colorScheme === 'dark' ? tg.themeParams : tg.themeParams;
