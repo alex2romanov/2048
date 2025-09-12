@@ -1,0 +1,71 @@
+<!-- kb.html — статическая страница "База знаний" (без sendData, только просмотр) -->
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>База знаний</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root { --bg:#fff; --text:#111; --card:#f2f3f5; --accent:#0a84ff; --muted:#6b7280; --radius:14px; }
+    body { margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { padding:16px; max-width:720px; margin:0 auto; }
+    .card { background:var(--card); border-radius:var(--radius); padding:16px; margin-top:12px; }
+    h1 { font-size:20px; margin:0 0 6px; }
+    .muted { color:var(--muted); font-size:14px; }
+    .gallery { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:10px; }
+    .gallery img { width:100%; height:200px; object-fit:cover; border-radius:12px; background:#fff; }
+    @media (max-width:520px){ .gallery{ grid-template-columns:1fr; } .gallery img{ height:auto; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>📕 База знаний</h1>
+      <div class="muted">Здесь вы можете посмотреть примеры и инструкцию.</div>
+    </div>
+
+    <div class="card">
+      <b>Модель</b>
+      <div id="model" class="muted" style="margin-top:6px">GPT-4o Mini</div>
+    </div>
+
+    <div class="card">
+      <b>Примеры</b>
+      <div class="gallery">
+        <!-- Замените пути на свои картинки в репозитории -->
+        <img src="./kb/1.jpg" alt="пример 1">
+        <img src="./kb/2.jpg" alt="пример 2">
+        <img src="./kb/3.jpg" alt="пример 3">
+        <img src="./kb/4.jpg" alt="пример 4">
+      </div>
+    </div>
+
+    <div class="card">
+      <b>Как пользоваться</b>
+      <div class="muted" style="margin-top:6px">
+        1) Откройте нужный раздел бота. 2) Следуйте подсказкам в чате. 3) Для генерации укажите промпт и (опционально) приложите изображение.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const tg = window.Telegram?.WebApp;
+      if (tg) {
+        tg.ready(); tg.expand?.();
+        const s = tg.themeParams || {};
+        document.documentElement.style.setProperty('--bg',    s.bg_color           || '#ffffff');
+        document.documentElement.style.setProperty('--text',  s.text_color         || '#111111');
+        document.documentElement.style.setProperty('--card',  s.secondary_bg_color || '#f2f3f5');
+        document.documentElement.style.setProperty('--accent',s.button_color       || '#0a84ff');
+        document.documentElement.style.setProperty('--muted', s.hint_color         || '#6b7280');
+      }
+      // Позволяет задать модель через ?model=... (по желанию)
+      const qp = new URLSearchParams(location.search);
+      const m = qp.get("model");
+      if (m) document.getElementById("model").textContent = m;
+    })();
+  </script>
+</body>
+</html>
